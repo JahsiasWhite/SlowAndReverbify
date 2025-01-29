@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slow & Reverbify</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Fallback for browsers that don't support SVG favicons -->
+    <link rel="alternate icon" type="image/png" href="favicon.png">
+
+    <style>
+        .backdrop-blur {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #4a1d96 0%, #1e3a8a 50%, #000000 100%);
+        }
+        
+        .custom-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .custom-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #9333ea;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .custom-range::-webkit-slider-thumb:hover {
+            background: #7e22ce;
+        }
+
+        .audio-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .audio-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: transparent;
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(156, 163, 175, 0.5);
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone:hover {
+            border-color: #9333ea;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(156, 163, 175, 0.3);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #9333ea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white p-8">
+    <div class="max-w-6xl mx-auto pb-20">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2 flex items-center justify-center gap-2">
+                <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 20V7l12-2v13"/>
+                    <circle cx="6" cy="20" r="3"/>
+                    <circle cx="18" cy="18" r="3"/>
+                </svg>
+                Slow & Reverbify
+            </h1>
+            <p class="text-gray-300">Transform your music with various effects</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Left Column - Audio Controls -->
+            <div class="space-y-6">
+                <!-- Upload Card -->
+                <div class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4">Upload Audio</h2>
+                    <div id="dropZone" class="drop-zone flex flex-col items-center justify-center h-48 rounded-lg hover:border-purple-500 transition-colors">
+                        <div class="text-center cursor-pointer">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <span class="text-gray-400">Drop your audio file or click to upload</span>
+                            <input type="file" id="audioInput" class="hidden" accept="audio/*">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player Card -->
+                <div id="playerCard" class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6 opacity-50 pointer-events-none">
+                    <h2 class="text-xl font-semibold mb-4">Audio Player</h2>
+                    <div class="space-y-6">
+                        <!-- Player Controls -->
+                        <div class="flex items-center justify-center gap-4">
+                            <button id="playPauseBtn" class="bg-purple-600 hover:bg-purple-700 rounded-full p-4 transition-colors">
+                                <!-- <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                </svg> -->
+                                <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
+                                </svg>
+                            </button>
+                            <span id="songName" class="font-medium"></span>
+                            <div class="text-sm">
+                                <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <!-- <div class="relative w-full h-2 bg-gray-700 rounded-full cursor-pointer">
+                            <div id="progressBar" class="absolute h-full bg-purple-600 rounded-full" style="width: 0%"></div>
+                        </div> -->
+                        <input 
+                        type="range" 
+                        id="progressBar"
+                        class="audio-slider w-full"
+                        value="0" 
+                        step="0.1"
+                        min="0" 
+                        max="100">
+
+                        <!-- Audio Controls -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Volume: <span id="volumeValue">100</span>%</label>
+                                <input type="range" id="volumeControl" class="custom-range" min="0" max="100" value="100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Speed: <span id="speedValue">1.00</span>x</label>
+                                <input type="range" id="speedControl" class="custom-range" min="0.25" max="2" step="0.05" value="1">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Reverb: <span id="reverbValue">0</span>%</label>
+                                <input type="range" id="reverbControl" class="custom-range" min="0" max="100" value="0">
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Visualizer Canvas -->
+                            <div class="h-24 bg-black bg-opacity-20 rounded-lg overflow-hidden">
+                                <canvas id="visualizer" class="w-full h-full"></canvas>
+                            </div>
+                        </div>
+
+                        <audio id="audioPlayer"></audio>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6">
+                <!-- Export Card -->
+                <div class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4">Export</h2>
+                    <div class="space-y-4">
+                        <!-- Export Options -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- MP3 Export -->
+                            <button id="exportMp3" class="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 rounded-lg px-4 py-3 transition-colors">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 20V7l12-2v13"/>
+                                    <circle cx="6" cy="20" r="3"/>
+                                    <circle cx="18" cy="18" r="3"/>
+                                </svg>
+                                Export MP3
+                            </button>
+                        </div>
+
+                        <!-- Export Status -->
+                        <div id="exportStatus" class="hidden">
+                            <div class="flex items-center justify-center gap-2 text-sm">
+                                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Exporting...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="fixed inset-x-0 bottom-0 bg-opacity-10 backdrop-blur ">
+            <div class="container mx-auto px-6 py-3 flex items-center justify-between text-sm text-gray-300">
+              <div class="flex-1 min-w-0">
+                Want more features? Try my desktop app 
+                <a 
+                  href="https://github.com/JahsiasWhite/AudioShape" 
+                  class="text-purple-400 hover:text-purple-300 font-medium underline px-1"
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  AudioShape
+                </a>
+                - a music player with real-time audio editing
+              </div>
+              <a
+                href="https://github.com/yourusername/yourrepo"
+                class="flex items-center text-gray-300 hover:text-white ml-4 transition-colors duration-200"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i class="github-icon mr-2"></i>
+                <span>View on GitHub</span>
+              </a>
+            </div>
+          </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('dropZone');
+            const audioInput = document.getElementById('audioInput');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playerCard = document.getElementById('playerCard');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const speedControl = document.getElementById('speedControl');
+            const volumeControl = document.getElementById('volumeControl');
+            const reverbControl = document.getElementById('reverbControl');
+            const speedValue = document.getElementById('speedValue');
+            const volumeValue = document.getElementById('volumeValue');
+            const reverbValue = document.getElementById('reverbValue');
+            const progressBar = document.getElementById('progressBar');
+            const currentTime = document.getElementById('currentTime');
+            const duration = document.getElementById('duration');
+
+            let isPlaying = false;
+            let audioContext;
+            let sourceNode;
+            let gainNode;
+            let reverbNode;
+            let dryGainNode;
+            let wetGainNode;
+
+            // Function to create a better impulse response
+            async function createImprovedImpulseResponse(context) {
+                const duration = 2.5;  // Slightly shorter for less mud
+                const sampleRate = context.sampleRate;
+                const length = Math.floor(sampleRate * duration);
+                const impulse = context.createBuffer(2, length, sampleRate);
+                
+                for (let channel = 0; channel < 2; channel++) {
+                    const channelData = impulse.getChannelData(channel);
+                    
+                    // Create initial impulse for brighter attack
+                    const initialImpulse = 0.5;
+                    channelData[0] = initialImpulse * (Math.random() * 0.8 + 0.2); // Randomize less for more consistency
+                    
+                    for (let i = 1; i < length; i++) {
+                        const t = i / length;
+                        const time = i / sampleRate;
+                        
+                        // Faster initial decay for clarity
+                        let decay = Math.exp(-t * 4);
+                        
+                        // Enhanced early reflections (first 50ms)
+                        if (i < sampleRate * 0.05) {
+                            // More pronounced early reflections
+                            decay *= 0.9 + (Math.random() * 0.2);
+                            
+                            // Add some sparse strong early reflections
+                            if (Math.random() < 0.1) {
+                                decay *= 2;
+                            }
+                        }
+                        
+                        // Mid reflections (50ms - 150ms)
+                        else if (i < sampleRate * 0.15) {
+                            decay *= 0.7 + (Math.random() * 0.3);
+                        }
+                        
+                        // Late reflections
+                        else {
+                            decay *= 0.4 + (Math.random() * 0.2);
+                        }
+                        
+                        // Enhanced high frequency content
+                        const highFreqBoost = Math.exp(-t * 2); // Slower decay for highs
+                        const midFreqBoost = Math.exp(-t * 3);
+                        
+                        // Combine frequency bands with bias towards highs
+                        decay *= (highFreqBoost * 0.7) + (midFreqBoost * 0.3);
+                        
+                        // Add some subtle modulation
+                        const modulation = 1 + (Math.sin(time * 2) * 0.001);
+                        
+                        channelData[i] = (Math.random() * 2 - 1) * decay * modulation;
+                    }
+                    
+                    // Normalize to prevent clipping
+                    let maxAmplitude = 0;
+                    for (let i = 0; i < length; i++) {
+                        maxAmplitude = Math.max(maxAmplitude, Math.abs(channelData[i]));
+                    }
+                    
+                    if (maxAmplitude > 0) {
+                        const normalizeAmount = 0.7 / maxAmplitude;
+                        for (let i = 0; i < length; i++) {
+                            channelData[i] *= normalizeAmount;
+                        }
+                    }
+                }
+                
+                return impulse;
+            }
+
+            async function initAudio() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    gainNode = audioContext.createGain();
+                    reverbNode = audioContext.createConvolver();
+                    dryGainNode = audioContext.createGain();
+                    wetGainNode = audioContext.createGain();
+
+                    // Use the improved impulse response
+                    const improvedImpulse = await createImprovedImpulseResponse(audioContext);
+                    reverbNode.buffer = improvedImpulse;
+                    
+                    // Set initial wet/dry mix for better clarity
+                    // dryGainNode.gain.value = 0.7;
+                    // wetGainNode.gain.value = 0.3;
+                }
+            }
+
+            // File Upload Handling
+            dropZone.addEventListener('click', () => audioInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-purple-500');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-purple-500');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-purple-500');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('audio/')) {
+                    handleAudioFile(file);
+                }
+            });
+
+            audioInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleAudioFile(file);
+                }
+            });
+
+            // Debounce function
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            async function handleAudioFile(file) {
+
+                const songName = document.getElementById('songName');
+                songName.textContent = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+
+                const url = URL.createObjectURL(file);
+                audioPlayer.src = url;
+                playerCard.classList.remove('opacity-50', 'pointer-events-none');
+
+                // Initialize Web Audio API
+                await initAudio();
+
+                // Create and connect nodes
+                if (sourceNode) {
+                    sourceNode.disconnect();
+                }
+
+                if (!sourceNode) {
+                    sourceNode = audioContext.createMediaElementSource(audioPlayer);
+
+                    dryGainNode.gain.value = 1;
+                    wetGainNode.gain.value = 0;
+                    gainNode.gain.value = 1;
+                } else {
+                    // This part is kinda ugly
+                    // This is if we've already uploaded
+                    // If we did, we must reset everything
+                    progressBar.style.background = `linear-gradient(to right, #9333ea 0%, rgba(255, 255, 255, 0.1) 0%)`;
+                    togglePlayPause();
+
+                    audioPlayer.playbackRate =  parseFloat(speedValue.textContent);
+                }
+
+                // Connect audio graph
+                sourceNode.connect(dryGainNode);
+                sourceNode.connect(reverbNode);
+                reverbNode.connect(wetGainNode);
+                dryGainNode.connect(gainNode);
+                wetGainNode.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+
+                // Set initial gains
+                // dryGainNode.gain.value = 1;
+                // wetGainNode.gain.value = 0;
+                // gainNode.gain.value = 1;
+
+                // Store nodes for later access
+                window.dryGainNode = dryGainNode;
+                window.wetGainNode = wetGainNode;
+
+                
+                // Add analyzer node for visualizer
+                const analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 256;
+                gainNode.connect(analyserNode);
+                
+                // Start visualizer
+                const canvas = document.getElementById('visualizer');
+                const canvasCtx = canvas.getContext('2d');
+                
+                function drawVisualizer() {
+                    const bufferLength = analyserNode.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    
+                    function draw() {
+                        requestAnimationFrame(draw);
+                        
+                        analyserNode.getByteFrequencyData(dataArray);
+                        
+                        canvas.width = canvas.clientWidth;
+                        canvas.height = canvas.clientHeight;
+                        
+                        const barWidth = canvas.width / bufferLength;
+                        const heightScale = canvas.height / 255;
+                        
+                        canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        for (let i = 0; i < bufferLength; i++) {
+                            const barHeight = dataArray[i] * heightScale;
+                            
+                            const hue = (i / bufferLength) * 260 + 100;
+                            canvasCtx.fillStyle = `hsla(${hue}, 100%, 50%, 0.8)`;
+                            
+                            const x = i * barWidth;
+                            const y = canvas.height - barHeight;
+                            
+                            canvasCtx.fillRect(x, y, barWidth - 1, barHeight);
+                        }
+                    }
+                    
+                    draw();
+                }
+                
+                drawVisualizer();
+            }
+
+            // Playback Controls
+            playPauseBtn.addEventListener('click', togglePlayPause);
+
+            function togglePlayPause() {
+                if (isPlaying) {
+                    audioPlayer.pause();
+                    playPauseBtn.innerHTML = `
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
+                        </svg>
+                    `;
+                } else {
+                    audioPlayer.play();
+                    playPauseBtn.innerHTML = `
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    `;
+                }
+                isPlaying = !isPlaying;
+            }
+
+            audioPlayer.addEventListener('timeupdate', () => {
+                const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                progressBar.value = progress;
+                currentTime.textContent = formatTime(audioPlayer.currentTime);
+
+                progressBar.style.background = `linear-gradient(to right, #9333ea ${progress}%, rgba(255, 255, 255, 0.1) ${progress}%)`;
+            });
+            // Handle seeking when user moves the slider
+            progressBar.addEventListener('input', (e) => {
+                const time = (progressBar.value / 100) * audioPlayer.duration;
+                audioPlayer.currentTime = time;
+
+                const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                progressBar.style.background = `linear-gradient(to right, #9333ea ${progress}%, rgba(255, 255, 255, 0.1) ${progress}%)`;
+            });
+
+            audioPlayer.addEventListener('ended', () => {
+                togglePlayPause();
+            });
+
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                duration.textContent = formatTime(audioPlayer.duration);
+            });
+
+            function formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+
+            // Audio Context and Nodes
+            let impulseResponse;
+
+            // Initialize audio context and create impulse response
+            async function initAudioContext() {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                gainNode = audioContext.createGain();
+                reverbNode = audioContext.createConvolver();
+                
+                // Create impulse response (simple exponential decay)
+                const sampleRate = audioContext.sampleRate;
+                const length = 2 * sampleRate; // 2 seconds
+                impulseResponse = audioContext.createBuffer(2, length, sampleRate);
+                
+                for (let channel = 0; channel < 2; channel++) {
+                    const channelData = impulseResponse.getChannelData(channel);
+                    for (let i = 0; i < length; i++) {
+                        channelData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.1));
+                    }
+                }
+                
+                reverbNode.buffer = impulseResponse;
+            }
+
+            // Setup audio processing chain
+            async function setupAudioChain() {
+                if (!audioContext) {
+                    await initAudioContext();
+                }
+
+                // Disconnect old source if it exists
+                if (sourceNode) {
+                    sourceNode.disconnect();
+                }
+
+                // Create new source from audio element
+                sourceNode = audioContext.createMediaElementSource(audioPlayer);
+
+                // Create parallel paths for dry/wet
+                const dryGainNode = audioContext.createGain();
+                const wetGainNode = audioContext.createGain();
+
+                // Connect the graph
+                sourceNode.connect(dryGainNode);
+                sourceNode.connect(reverbNode);
+                reverbNode.connect(wetGainNode);
+
+                dryGainNode.connect(gainNode);
+                wetGainNode.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Set initial values
+                dryGainNode.gain.value = 1;
+                wetGainNode.gain.value = 0;
+
+                // Store nodes for later access
+                window.dryGainNode = dryGainNode;
+                window.wetGainNode = wetGainNode;
+            }
+
+            // Effect Controls
+            speedControl.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                speedValue.textContent = value.toFixed(2);
+                audioPlayer.playbackRate = value;
+                audioPlayer.preservesPitch = false;
+            });
+
+            volumeControl.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                volumeValue.textContent = value;
+                audioPlayer.volume = value / 100;
+            });
+
+            reverbControl.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                reverbValue.textContent = value;
+
+                // Convert slider value (0-100) to gain values (0-1)
+                const wetLevel = value / 100;
+                const dryLevel = 1 - wetLevel;
+                
+                // Update the gain nodes
+                if (window.dryGainNode && window.wetGainNode) {
+                    window.dryGainNode.gain.value = dryLevel;
+                    window.wetGainNode.gain.value = wetLevel;
+                } else {
+                    console.error('Gain nodes not found');
+                }
+            });
+
+            /* Export stuff */
+            async function exportMP3() {
+                const exportStatus = document.getElementById('exportStatus');
+                exportStatus.classList.remove('hidden');
+
+                try {
+                    // Get the audio file
+                    const response = await fetch(audioPlayer.src);
+                    const arrayBuffer = await response.arrayBuffer();
+                    
+                    // Create an offline context with the correct duration plus a small buffer
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    
+                    // Add 0.1 seconds of silence at the start to prevent artifacts
+                    const paddingDuration = 0.1;
+                    const duration = (audioBuffer.duration / audioPlayer.playbackRate) + paddingDuration;
+                    const offlineCtx = new OfflineAudioContext({
+                        numberOfChannels: 2,
+                        length: Math.ceil(audioContext.sampleRate * duration),
+                        sampleRate: audioContext.sampleRate
+                    });
+
+                    // Create nodes
+                    const offlineSource = offlineCtx.createBufferSource();
+                    const offlineGain = offlineCtx.createGain();
+                    const offlineReverb = offlineCtx.createConvolver();
+                    const offlineDry = offlineCtx.createGain();
+                    const offlineWet = offlineCtx.createGain();
+
+                    // Set source buffer and playback rate
+                    offlineSource.buffer = audioBuffer;
+                    offlineSource.playbackRate.value = audioPlayer.playbackRate;
+
+                    // Create reverb impulse response
+                    const reverbBuffer = offlineCtx.createBuffer(2, offlineCtx.sampleRate * 2, offlineCtx.sampleRate);
+                    for (let channel = 0; channel < 2; channel++) {
+                        const channelData = reverbBuffer.getChannelData(channel);
+                        for (let i = 0; i < reverbBuffer.length; i++) {
+                            channelData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (offlineCtx.sampleRate * 0.1));
+                        }
+                    }
+                    offlineReverb.buffer = reverbBuffer;
+                    const improvedImpulse = await createImprovedImpulseResponse(audioContext);
+                    offlineReverb.buffer = improvedImpulse;
+
+                    // Connect nodes
+                    offlineSource.connect(offlineDry);
+                    offlineSource.connect(offlineReverb);
+                    offlineReverb.connect(offlineWet);
+                    offlineDry.connect(offlineGain);
+                    offlineWet.connect(offlineGain);
+                    offlineGain.connect(offlineCtx.destination);
+
+                    // Apply current effect values
+                    offlineGain.gain.value = audioPlayer.volume;
+                    const reverbValue = parseInt(document.getElementById('reverbControl').value);
+                    const wetLevel = reverbValue / 100;
+                    const dryLevel = 1 - wetLevel;
+                    offlineDry.gain.value = dryLevel;
+                    offlineWet.gain.value = wetLevel;
+
+                    // Start the source after the padding duration
+                    offlineSource.start(paddingDuration);
+                    const renderedBuffer = await offlineCtx.startRendering();
+
+                    // Create Web Worker for MP3 encoding
+                    const worker = new Worker(URL.createObjectURL(new Blob([`
+                        importScripts('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js');
+                        
+                        onmessage = function(e) {
+                            const channels = e.data.channels;
+                            const sampleRate = e.data.sampleRate;
+                            const mp3enc = new lamejs.Mp3Encoder(2, sampleRate, 192);
+                            const mp3Data = [];
+
+                            const blockSize = 1152; // must be multiple of 576
+                            const numSamples = channels[0].length;
+                            
+                            for (let i = 0; i < numSamples; i += blockSize) {
+                                const leftChunk = new Int16Array(blockSize);
+                                const rightChunk = new Int16Array(blockSize);
+                                
+                                for (let j = 0; j < blockSize && (i + j) < numSamples; j++) {
+                                    // Convert float32 to int16
+                                    leftChunk[j] = channels[0][i + j] < 0 ? 
+                                        Math.max(-32768, Math.floor(channels[0][i + j] * 32768)) : 
+                                        Math.min(32767, Math.floor(channels[0][i + j] * 32767));
+                                    rightChunk[j] = channels[1][i + j] < 0 ? 
+                                        Math.max(-32768, Math.floor(channels[1][i + j] * 32768)) : 
+                                        Math.min(32767, Math.floor(channels[1][i + j] * 32767));
+                                }
+                                
+                                const mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
+                                if (mp3buf.length > 0) {
+                                    mp3Data.push(mp3buf);
+                                }
+                            }
+
+                            const mp3buf = mp3enc.flush();
+                            if (mp3buf.length > 0) {
+                                mp3Data.push(mp3buf);
+                            }
+
+                            const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+                            postMessage(blob);
+                        };
+                    `])));
+
+                    worker.onmessage = function(e) {
+                        const blob = e.data;
+                        const url = URL.createObjectURL(blob);
+                        
+                        // Create download link
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = url;
+                        downloadLink.download = 'processed_audio.mp3';
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                        
+                        // Clean up
+                        URL.revokeObjectURL(url);
+                        worker.terminate();
+                        exportStatus.classList.add('hidden');
+                    };
+
+                    // Send audio data to worker
+                    worker.postMessage({
+                        channels: [
+                            renderedBuffer.getChannelData(0),
+                            renderedBuffer.getChannelData(1)
+                        ],
+                        sampleRate: renderedBuffer.sampleRate
+                    });
+
+                } catch (error) {
+                    console.error('Export failed:', error);
+                    exportStatus.innerHTML = `
+                        <div class="flex items-center justify-center gap-2 text-sm text-red-500">
+                            <span>Export failed. Please try again.</span>
+                        </div>
+                    `;
+                    // setTimeout(() => {
+                    //     exportStatus.classList.add('hidden');
+                    // }, 10000);
+                }
+            }
+
+            // Update the event listeners for export buttons
+            document.getElementById('exportMp3').addEventListener('click', exportMP3);
+
+
+        });
+    </script
+  </body>
+</html>
