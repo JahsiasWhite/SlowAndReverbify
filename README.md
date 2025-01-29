@@ -1,6 +1,6 @@
 # Slow & Reverbify
 
-Slow & Reverbify is an interactive web application that allows you to apply various audio effects to your music. You can upload an audio file, adjust parameters like speed, volume, and reverb, and then export the modified track. It also provides a real-time audio visualizer to enhance your experience. Try here: https://slowandreverbify.com
+Slow & Reverbify is an interactive web application that allows you to apply various audio effects to your music. Try here: https://slowandreverbify.com
 <br />
 
 <p align="center">
