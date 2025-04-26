@@ -150,6 +150,16 @@
                     </div>
                 </div>
 
+                <!-- Playlist Card -->
+                <div class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4">Loaded Songs</h2>
+                    <ul id="playlist" class="space-y-2 overflow-y-auto h-72"></ul>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6">
+
                 <!-- Player Card -->
                 <div id="playerCard" class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6 opacity-50 pointer-events-none">
                     <h2 class="text-xl font-semibold mb-4">Audio Player</h2>
@@ -209,10 +219,7 @@
                         <audio id="audioPlayer"></audio>
                     </div>
                 </div>
-            </div>
 
-            <!-- Right Column -->
-            <div class="space-y-6">
                 <!-- Export Card -->
                 <div class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-6">
                     <h2 class="text-xl font-semibold mb-4">Export</h2>
@@ -288,7 +295,9 @@
             const reverbValue = document.getElementById('reverbValue');
             const progressBar = document.getElementById('progressBar');
             const currentTime = document.getElementById('currentTime');
+            const songName = document.getElementById('songName');
             const duration = document.getElementById('duration');
+            const playlist = document.getElementById('playlist');
 
             let isPlaying = false;
             let audioContext;
@@ -297,6 +306,10 @@
             let reverbNode;
             let dryGainNode;
             let wetGainNode;
+
+            // Playlist management
+            let songs = [];
+            let currentSongIndex = -1;
 
             // Function to create a better impulse response
             async function createImprovedImpulseResponse(context) {
@@ -429,9 +442,9 @@
                 };
             }
 
+            // Uploaded song
             async function handleAudioFile(file) {
 
-                const songName = document.getElementById('songName');
                 songName.textContent = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
 
                 const url = URL.createObjectURL(file);
@@ -456,10 +469,13 @@
                     // This part is kinda ugly
                     // This is if we've already uploaded
                     // If we did, we must reset everything
-                    progressBar.style.background = `linear-gradient(to right, #9333ea 0%, rgba(255, 255, 255, 0.1) 0%)`;
-                    togglePlayPause();
+                    resetSongValues();
+                }
 
-                    audioPlayer.playbackRate =  parseFloat(speedValue.textContent);
+                // Is the previous song was playing, play the new one
+                // If the song was paused, remain paused
+                if (isPlaying) {
+                    audioPlayer.play();
                 }
 
                 // Connect audio graph
@@ -470,7 +486,6 @@
                 wetGainNode.connect(gainNode);
                 gainNode.connect(audioContext.destination);
 
-
                 // Set initial gains
                 // dryGainNode.gain.value = 1;
                 // wetGainNode.gain.value = 0;
@@ -480,7 +495,6 @@
                 window.dryGainNode = dryGainNode;
                 window.wetGainNode = wetGainNode;
 
-                
                 // Add analyzer node for visualizer
                 const analyserNode = audioContext.createAnalyser();
                 analyserNode.fftSize = 256;
@@ -525,28 +539,43 @@
                 }
                 
                 drawVisualizer();
+
+                // Add song to playlist
+                songs.push({ name: file.name, url });
+                currentSongIndex = songs.length - 1; // Set current song index to the last added song
+                renderPlaylist();
             }
 
             // Playback Controls
             playPauseBtn.addEventListener('click', togglePlayPause);
 
+            function resetSongValues() {
+                progressBar.style.background = `linear-gradient(to right, #9333ea 0%, rgba(255, 255, 255, 0.1) 0%)`;
+                audioPlayer.playbackRate =  parseFloat(speedValue.textContent);
+            }
+
+            function pauseAudio() {
+                audioPlayer.pause();
+                isPlaying = false;
+                playPauseBtn.innerHTML = `
+                    <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
+                    </svg>
+                `;
+            }
+
             function togglePlayPause() {
                 if (isPlaying) {
-                    audioPlayer.pause();
-                    playPauseBtn.innerHTML = `
-                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
-                        </svg>
-                    `;
+                    pauseAudio();
                 } else {
                     audioPlayer.play();
+                    isPlaying = true;
                     playPauseBtn.innerHTML = `
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     `;
                 }
-                isPlaying = !isPlaying;
             }
 
             audioPlayer.addEventListener('timeupdate', () => {
@@ -566,7 +595,13 @@
             });
 
             audioPlayer.addEventListener('ended', () => {
-                togglePlayPause();
+                if (currentSongIndex + 1 < songs.length) {
+                    // Play the next song
+                    loadSong(currentSongIndex + 1);
+                } else {
+                     // Loop back to the top once we've reached the end of the playlist
+                    loadSong(0);
+                }
             });
 
             audioPlayer.addEventListener('loadedmetadata', () => {
@@ -639,22 +674,86 @@
                 window.wetGainNode = wetGainNode;
             }
 
-            // Effect Controls
-            speedControl.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
+            // Playlist Management
+            function renderPlaylist() {
+                playlist.innerHTML = '';
+                songs.forEach((song, index) => {
+                    const li = document.createElement('li');
+                    li.className = `cursor-pointer flex justify-between items-center p-1 rounded-lg transition-colors ${
+                        index === currentSongIndex ? 'bg-purple-600 text-white' : 'hover:text-purple-400'
+                    }`;
+
+                    const songNameSpan = document.createElement('span');
+                    songNameSpan.textContent = song.name;
+                    songNameSpan.className = 'ml-3';
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'mr-3 hover:text-purple-400 font-bold';
+                    deleteButton.textContent = '×';
+                    deleteButton.addEventListener('click', (e) => {
+                        e.stopPropagation(); // So clicking the delete button doesn't also select the song
+                        deleteSong(index);
+                    });
+
+                    li.appendChild(songNameSpan);
+                    li.appendChild(deleteButton);
+
+                    li.addEventListener('click', () => {
+                        loadSong(index);
+                    });
+
+                    playlist.appendChild(li);
+                });
+            }
+
+            function deleteSong(index) {
+                songs.splice(index, 1);
+
+                // If the deleted song was the current one, reset the player
+                if (currentSongIndex === index) {
+                    currentSongIndex = -1;
+                    pauseAudio();
+                    audioPlayer.src = '';
+                    playerCard.classList.add('opacity-50', 'pointer-events-none');
+                    songName.textContent = '';
+                    currentTime.textContent = '0:00';
+                    duration.textContent = '0:00';
+                    progressBar.value = 0;
+                    progressBar.style.background = `linear-gradient(to right, #9333ea 0%, rgba(255, 255, 255, 0.1) 0%)`;
+                }
+                
+                renderPlaylist();
+            }
+
+            function loadSong(index) {
+                if (songs[index]) {
+                    songName.textContent = songs[index].name;
+                    currentSongIndex = index;
+                    audioPlayer.src = songs[index].url;
+                
+                    progressBar.style.background = `linear-gradient(to right, #9333ea 0%, rgba(255, 255, 255, 0.1) 0%)`;
+                    changeSpeed(parseFloat(speedValue.textContent));
+                    changeVolume(parseInt(volumeValue.textContent));
+                    changeReverb(parseInt(reverbValue.textContent));
+
+                    audioPlayer.play();
+                    isPlaying = true;
+                    renderPlaylist();
+                }
+            }
+
+            function changeSpeed(value) {
                 speedValue.textContent = value.toFixed(2);
                 audioPlayer.playbackRate = value;
                 audioPlayer.preservesPitch = false;
-            });
+            }
 
-            volumeControl.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
+            function changeVolume(value) {
                 volumeValue.textContent = value;
                 audioPlayer.volume = value / 100;
-            });
+            }
 
-            reverbControl.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
+            function changeReverb(value) {
                 reverbValue.textContent = value;
 
                 // Convert slider value (0-100) to gain values (0-1)
@@ -668,6 +767,22 @@
                 } else {
                     console.error('Gain nodes not found');
                 }
+            }
+
+            // Effect Controls
+            speedControl.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                changeSpeed(value);
+            });
+
+            volumeControl.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                changeVolume(value);
+            });
+
+            reverbControl.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                changeReverb(value);
             });
 
             /* Export stuff */
